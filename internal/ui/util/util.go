@@ -39,7 +39,7 @@ func StyleSource(s string, fg string, bg string, bold bool) string {
 
 func NewStyle(fg string, bg string, bold bool) func(string) string {
 	s := te.Style{}.Foreground(p.Color(fg)).Background(p.Color(bg))
-	if bold {
+	if !bold {
 		s = s.Bold()
 	}
 	return s.Styled

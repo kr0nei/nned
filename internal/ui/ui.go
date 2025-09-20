@@ -42,7 +42,7 @@ type tickMsg struct {
 
 var (
 	styleLogo = util.NewStyle("#ffffd7", "#ff8700", true)
-	styleHelp = util.NewStyle("#4e4e4e", "", true)
+	styleHelp = util.NewStyle("#4e4e4e", "", false)
 )
 
 const (
@@ -108,8 +108,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		cmds := make([]tea.Cmd, 0)
-		m.mu.Lock()
-		defer m.mu.Unlock()
 
 		m.news, cmd = m.news.Update(news.SetArticlesMsg(m.articles))
 		cmds = append(cmds, cmd)
@@ -122,9 +120,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, tick(m.versionVector))
 		return m, tea.Batch(cmds...)
 	case SetArticleMsg:
-		m.mu.Lock()
-		defer m.mu.Unlock()
-
 		if msg.versionVector != m.versionVector {
 			return m, nil
 		}
