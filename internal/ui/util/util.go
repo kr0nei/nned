@@ -4,11 +4,9 @@ import (
 	"hash/fnv"
 	"strings"
 
-	te "github.com/muesli/termenv"
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/net/html"
 )
-
-var p = te.ColorProfile()
 
 func extractText(n *html.Node, sb *strings.Builder) {
 	if n.Type == html.TextNode {
@@ -33,16 +31,8 @@ func GetStringFromHTML(s string) (string, error) {
 	return sb.String(), nil
 }
 
-func StyleSource(s string, fg string, bg string, bold bool) string {
-	return NewStyle(fg, bg, bold)(s)
-}
-
-func NewStyle(fg string, bg string, bold bool) func(string) string {
-	s := te.Style{}.Foreground(p.Color(fg)).Background(p.Color(bg))
-	if !bold {
-		s = s.Bold()
-	}
-	return s.Styled
+func NewStyle(fg string, bg string, bold bool) lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(fg)).Background(lipgloss.Color(bg)).Bold(!bold)
 }
 
 func GetHash(s string) uint64 {

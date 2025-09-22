@@ -1,6 +1,7 @@
 package news
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ type UpdateArticlesMsg []c.Article
 
 type Model struct {
 	width    int
+	cursor   int
 	articles []*c.Article
 	rows     []*row.Model
 	amap     map[uint64]c.Article
@@ -29,13 +31,14 @@ func NewModel() *Model {
 		width:    80,
 		articles: make([]*c.Article, 0),
 		amap:     make(map[uint64]c.Article),
+		cursor:   0,
 	}
 }
 func (m *Model) Init() tea.Cmd { return nil }
 func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case SetArticlesMsg:
-		var cmd tea.Cmd
 		cmds := make([]tea.Cmd, 0)
 		articles := make([]*c.Article, 0)
 
@@ -66,6 +69,31 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		//}
 		m.articles = articles
 		return m, tea.Batch(cmds...)
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up": // TODO: set previous to not bold
+			prev_c := m.cursor
+			m.cursor--
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+			if prev_c != m.cursor {
+				m.rows[m.cursor], cmd = m.rows[m.cursor].Update(row.SetBoldMsg{Bold: true})
+				m.rows[prev_c], cmd = m.rows[prev_c].Update(row.SetBoldMsg{Bold: false})
+			}
+			return m, nil
+		case "down":
+			prev_c := m.cursor
+			m.cursor++
+			if m.cursor > len(m.rows)-1 {
+				m.cursor = len(m.rows) - 1
+			}
+			if prev_c != m.cursor {
+				m.rows[m.cursor], cmd = m.rows[m.cursor].Update(row.SetBoldMsg{Bold: true})
+				m.rows[prev_c], cmd = m.rows[prev_c].Update(row.SetBoldMsg{Bold: false})
+			}
+			return m, nil
+		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		for i, a := range m.rows {
@@ -83,6 +111,7 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		}
 		return m, tea.Batch(cmds...)
 	}
+	fmt.Printf("%#v\n", msg)
 	return m, nil
 }
 

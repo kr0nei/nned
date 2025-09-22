@@ -20,7 +20,8 @@ const (
 
 var (
 	lastID           int64
-	titleStyle       = util.NewStyle("#EBEBEB", "", true)
+	titleStyle       = util.NewStyle("#EBEBEB", "", false)
+	unreadStyle      = util.NewStyle("#FF0000", "", true)
 	descriptionStyle = util.NewStyle("#A0A0A0", "", false)
 	timeStyle        = util.NewStyle("#666666", "", false)
 	lineStyle        = util.NewStyle("#444444", "", false)
@@ -30,6 +31,7 @@ type Model struct {
 	id     int
 	width  int
 	config Config
+	bold   bool
 }
 
 type Config struct {
@@ -44,6 +46,10 @@ type FrameMsg int
 
 type SetCellWidthMsg struct {
 	Width int
+}
+
+type SetBoldMsg struct {
+	Bold bool
 }
 
 func New(config Config) *Model {
@@ -70,6 +76,8 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	case SetCellWidthMsg:
 		m.width = msg.Width
 		return m, nil
+	case SetBoldMsg:
+		m.bold = msg.Bold
 	case UpdateArticleMsg:
 		m.config.Article = msg
 		return m, nil
@@ -84,15 +92,15 @@ func (m *Model) View() string {
 	rows = append(rows, grid.Row{
 		Width: m.width,
 		Cells: []grid.Cell{
-			{Text: titleStyle(m.config.Article.Title), Width: len(m.config.Article.Title)},
+			{Text: titleStyle.Bold(!m.bold).Render(m.config.Article.Title) + unreadStyle.Render(" • "), Width: len(m.config.Article.Title) + 4},
 		},
 	})
 	time_s := timeAgo(m.config.Article.Date)
 	rows = append(rows, grid.Row{
 		Width: m.width,
 		Cells: []grid.Cell{
-			{Text: util.StyleSource(m.config.Article.SourceTitle[:min(len(m.config.Article.SourceTitle), 10)], "#DDDDDD", m.config.Article.SourceColor, true), Width: min(len(m.config.Article.SourceTitle), 10), Align: grid.Right},
-			{Text: timeStyle(time_s), Width: len(time_s), Align: grid.Left},
+			{Text: m.config.Article.SourceTitle[:min(len(m.config.Article.SourceTitle), 10)], Width: min(len(m.config.Article.SourceTitle), 10), Align: grid.Right},
+			{Text: timeStyle.Render(time_s), Width: len(time_s), Align: grid.Left},
 		},
 	})
 
@@ -103,13 +111,13 @@ func (m *Model) View() string {
 	rows = append(rows, grid.Row{
 		Width: m.width,
 		Cells: []grid.Cell{
-			{Text: descriptionStyle(description), Align: grid.Left, Overflow: grid.WrapWord},
+			{Text: descriptionStyle.Render(description), Align: grid.Left, Overflow: grid.WrapWord},
 		},
 	})
 	rows = append(rows, grid.Row{
 		Width: m.width,
 		Cells: []grid.Cell{
-			{Text: lineStyle(strings.Repeat("━", m.width))},
+			{Text: lineStyle.Render(strings.Repeat("━", m.width))},
 		},
 	})
 	return grid.Render(grid.Grid{
