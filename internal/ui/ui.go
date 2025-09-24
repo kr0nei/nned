@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -82,7 +83,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-
 		case "ctrl+c":
 			fallthrough
 		case "esc":
@@ -103,6 +103,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.news, cmd = m.news.Update(msg)
 			return m, cmd
+		case "enter":
+			m.article, cmd = m.article.Update(article.SetArticleMsg(&m.articles[m.cursor]))
+			m.news, cmd = m.news.Update(msg)
+			return m, cmd
+		case "m":
+			m.news, cmd = m.news.Update(msg)
+			return m, cmd
 		}
 	case tea.WindowSizeMsg:
 		var cmd tea.Cmd
@@ -111,7 +118,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.ready {
 			m.viewport = viewport.New(msg.Width, viewportHeight)
 			m.ready = true
-			m.news.SetWidth(3 * msg.Width / 5)
+			m.news.SetWidth(msg.Width / 2)
+			m.article.SetDimensions(msg.Width/2, viewportHeight)
 		} else {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = viewportHeight
@@ -137,6 +145,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.articles = append(m.articles, msg.article)
+		slices.SortFunc(m.articles, util.DateCmp)
 		return m, nil
 
 	case row.FrameMsg:
@@ -171,7 +180,7 @@ func footer(width int, time string) string {
 	if width < minFooterWidth {
 		return "nned"
 	}
-	help := "q: exit ↑: scroll up ↓: scroll down s: search m: mark read/unread"
+	help := "q: exit ↑: scroll up ↓: scroll down s: search m: mark read/unread enter: read article"
 	return grid.Render(grid.Grid{
 		Rows: []grid.Row{
 			{

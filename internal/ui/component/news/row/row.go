@@ -2,7 +2,6 @@ package row
 
 import (
 	"fmt"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 
 	grid "github.com/achannarasappa/term-grid"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -19,12 +19,10 @@ const (
 )
 
 var (
-	lastID           int64
-	titleStyle       = util.NewStyle("#EBEBEB", "", false)
-	unreadStyle      = util.NewStyle("#FF0000", "", true)
-	descriptionStyle = util.NewStyle("#A0A0A0", "", false)
-	timeStyle        = util.NewStyle("#666666", "", false)
-	lineStyle        = util.NewStyle("#444444", "", false)
+	lastID      int64
+	titleStyle  = util.NewStyle("#EBEBEB", "", false)
+	unreadStyle = util.NewStyle("#FF0000", "", true)
+	timeStyle   = util.NewStyle("#666666", "", false)
 )
 
 type Model struct {
@@ -32,6 +30,7 @@ type Model struct {
 	width  int
 	config Config
 	bold   bool
+	unread bool
 }
 
 type Config struct {
@@ -48,9 +47,14 @@ type SetCellWidthMsg struct {
 	Width int
 }
 
-type SetBoldMsg struct {
-	Bold bool
-}
+type (
+	ToggleReadMsg struct{}
+	SetReadMsg    struct{}
+)
+
+type (
+	SetBoldMsg bool
+)
 
 func New(config Config) *Model {
 	var id int
@@ -64,6 +68,8 @@ func New(config Config) *Model {
 		id:     id,
 		width:  config.Width,
 		config: config,
+		bold:   false,
+		unread: true,
 	}
 }
 
@@ -77,7 +83,12 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		m.width = msg.Width
 		return m, nil
 	case SetBoldMsg:
-		m.bold = msg.Bold
+		m.bold = bool(msg)
+	case SetReadMsg:
+		m.unread = false
+	case ToggleReadMsg:
+		m.unread = !m.unread
+		return m, nil
 	case UpdateArticleMsg:
 		m.config.Article = msg
 		return m, nil
@@ -89,41 +100,34 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	rows := []grid.Row{}
+	readStr := "•"
+	if !m.unread {
+		readStr = ""
+	}
 	rows = append(rows, grid.Row{
 		Width: m.width,
 		Cells: []grid.Cell{
-			{Text: titleStyle.Bold(!m.bold).Render(m.config.Article.Title) + unreadStyle.Render(" • "), Width: len(m.config.Article.Title) + 4},
+			{Text: titleStyle.Bold(!m.bold).Render(m.config.Article.Title), Width: m.width - 4, Overflow: grid.Hidden},
+			{Text: unreadStyle.Render(readStr), Width: 4},
 		},
 	})
 	time_s := timeAgo(m.config.Article.Date)
 	rows = append(rows, grid.Row{
 		Width: m.width,
 		Cells: []grid.Cell{
-			{Text: m.config.Article.SourceTitle[:min(len(m.config.Article.SourceTitle), 10)], Width: min(len(m.config.Article.SourceTitle), 10), Align: grid.Right},
-			{Text: timeStyle.Render(time_s), Width: len(time_s), Align: grid.Left},
+			{Text: lipgloss.NewStyle().Background(lipgloss.Color(m.config.Article.SourceColor)).Render(m.config.Article.SourceTitle), Width: 10, Align: grid.Left, Overflow: grid.Hidden},
+			{Text: timeStyle.Render(time_s), Width: m.width - 10, Align: grid.Left},
 		},
 	})
 
-	description, err := util.GetStringFromHTML(m.config.Article.Description)
-	if err != nil {
-		description = ""
-	}
-	rows = append(rows, grid.Row{
-		Width: m.width,
-		Cells: []grid.Cell{
-			{Text: descriptionStyle.Render(description), Align: grid.Left, Overflow: grid.WrapWord},
-		},
+	border := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("#444444")).
+		BorderBottom(true)
+	rendered_row := grid.Render(grid.Grid{
+		Rows: rows,
 	})
-	rows = append(rows, grid.Row{
-		Width: m.width,
-		Cells: []grid.Cell{
-			{Text: lineStyle.Render(strings.Repeat("━", m.width))},
-		},
-	})
-	return grid.Render(grid.Grid{
-		Rows:             rows,
-		GutterHorizontal: 1,
-	})
+	return border.Render(rendered_row)
 }
 
 func timeAgo(date *time.Time) string {

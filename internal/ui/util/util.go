@@ -4,6 +4,8 @@ import (
 	"hash/fnv"
 	"strings"
 
+	c "nned/internal/common"
+
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/net/html"
 )
@@ -32,11 +34,25 @@ func GetStringFromHTML(s string) (string, error) {
 }
 
 func NewStyle(fg string, bg string, bold bool) lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(fg)).Background(lipgloss.Color(bg)).Bold(!bold)
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(fg)).
+		Background(lipgloss.Color(bg)).
+		Bold(!bold)
+	return style
 }
 
 func GetHash(s string) uint64 {
 	h := fnv.New64a()
 	h.Write([]byte(s))
 	return h.Sum64()
+}
+
+func DateCmp(a, b c.Article) int {
+	if a.Date == b.Date {
+		return 0
+	} else if a.Date.Before(*b.Date) {
+		return 1
+	} else {
+		return -1
+	}
 }
