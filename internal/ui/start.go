@@ -18,7 +18,7 @@ func Start(dep *c.Dependencies, ctx *c.Context) func() error {
 		p := tea.NewProgram(
 			NewModel(*dep, *ctx, monitor),
 			tea.WithMouseCellMotion(),
-			// tea.WithAltScreen(),
+			tea.WithAltScreen(),
 		)
 
 		var err error

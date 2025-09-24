@@ -2,9 +2,11 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
+	"nned/internal/ui/component/article"
 	"nned/internal/ui/component/news"
 	"nned/internal/ui/component/news/row"
 	"nned/internal/ui/util"
@@ -15,11 +17,13 @@ import (
 	grid "github.com/achannarasappa/term-grid"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type Model struct {
 	articles       []c.Article
 	news           *news.Model
+	article        *article.Model
 	cursor         int
 	ctx            c.Context
 	viewport       viewport.Model
@@ -41,7 +45,7 @@ type tickMsg struct {
 }
 
 var (
-	styleLogo = util.NewStyle("#ffffd7", "#ff8700", true)
+	styleLogo = util.NewStyle("#111111", "#ff8700", true)
 	styleHelp = util.NewStyle("#4e4e4e", "", false)
 )
 
@@ -57,6 +61,7 @@ func NewModel(dep c.Dependencies, ctx c.Context, monitor *mon.Monitor) *Model {
 		ctx:          ctx,
 		ready:        false,
 		news:         news.NewModel(),
+		article:      article.NewModel(),
 		headerHeight: 0,
 		monitor:      monitor,
 	}
@@ -78,7 +83,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-
 		case "ctrl+c":
 			fallthrough
 		case "esc":
@@ -86,10 +90,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			return m, tea.Quit
 		case "up":
-			m.viewport, cmd = m.viewport.Update(msg)
+			m.cursor--
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+			m.news, cmd = m.news.Update(msg)
 			return m, cmd
 		case "down":
-			m.viewport, cmd = m.viewport.Update(msg)
+			m.cursor++
+			if m.cursor > len(m.articles)-1 {
+				m.cursor = len(m.articles) - 1
+			}
+			m.news, cmd = m.news.Update(msg)
+			return m, cmd
+		case "enter":
+			m.article, cmd = m.article.Update(article.SetArticleMsg(&m.articles[m.cursor]))
+			m.news, cmd = m.news.Update(msg)
+			return m, cmd
+		case "m":
+			m.news, cmd = m.news.Update(msg)
 			return m, cmd
 		}
 	case tea.WindowSizeMsg:
@@ -99,7 +118,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.ready {
 			m.viewport = viewport.New(msg.Width, viewportHeight)
 			m.ready = true
-			m.news.SetWidth(msg.Width)
+			m.news.SetWidth(msg.Width / 2)
+			m.article.SetDimensions(msg.Width/2, viewportHeight)
 		} else {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = viewportHeight
@@ -125,6 +145,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.articles = append(m.articles, msg.article)
+		slices.SortFunc(m.articles, util.DateCmp)
 		return m, nil
 
 	case row.FrameMsg:
@@ -139,7 +160,9 @@ func (m *Model) View() string {
 	if !m.ready {
 		return "\n Fetching articles..."
 	}
-	m.viewport.SetContent(m.news.View())
+	content := "Loading content..."
+	content = lipgloss.JoinHorizontal(lipgloss.Top, m.news.View(), m.article.View())
+	m.viewport.SetContent(content)
 
 	return m.viewport.View() + "\n" +
 		footer(m.viewport.Width, m.lastUpdateTime)
@@ -157,14 +180,15 @@ func footer(width int, time string) string {
 	if width < minFooterWidth {
 		return "nned"
 	}
+	help := "q: exit ↑: scroll up ↓: scroll down s: search m: mark read/unread enter: read article"
 	return grid.Render(grid.Grid{
 		Rows: []grid.Row{
 			{
 				Width: width,
 				Cells: []grid.Cell{
-					{Text: styleLogo("nned"), Width: 8},
-					{Text: styleHelp("q: exit ↑: scroll up ↓: scroll down"), Width: 52},
-					{Text: styleHelp("T: " + time), Align: grid.Right},
+					{Text: styleLogo.Render(" nned "), Width: 7},
+					{Text: styleHelp.Render(help), Width: len(help)},
+					{Text: styleHelp.Render("T: " + time), Align: grid.Right},
 				},
 			},
 		},
