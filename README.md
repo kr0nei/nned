@@ -6,7 +6,7 @@
 - [ ] Add a way to filter / search news
 - [x] Add UI element to show read / unread news
 - [ ] Add header for more information.
-- [ ] Add a way to mark / unread news as read
+- [x] Add a way to mark / unread news as read
 - [ ] Add tests
 - [ ] Add project to linux package managers
 

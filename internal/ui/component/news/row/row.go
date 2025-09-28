@@ -28,9 +28,10 @@ var (
 type Model struct {
 	id     int
 	width  int
-	config Config
+	Config Config
 	bold   bool
 	unread bool
+	Show   bool
 }
 
 type Config struct {
@@ -67,9 +68,10 @@ func New(config Config) *Model {
 	return &Model{
 		id:     id,
 		width:  config.Width,
-		config: config,
+		Config: config,
 		bold:   false,
 		unread: true,
+		Show:   true,
 	}
 }
 
@@ -90,7 +92,7 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		m.unread = !m.unread
 		return m, nil
 	case UpdateArticleMsg:
-		m.config.Article = msg
+		m.Config.Article = msg
 		return m, nil
 	case FrameMsg:
 		return m, nil
@@ -107,19 +109,18 @@ func (m *Model) View() string {
 	rows = append(rows, grid.Row{
 		Width: m.width,
 		Cells: []grid.Cell{
-			{Text: titleStyle.Bold(!m.bold).Render(m.config.Article.Title), Width: m.width - 4, Overflow: grid.Hidden},
+			{Text: titleStyle.Bold(!m.bold).Render(m.Config.Article.Title), Width: m.width - 4, Overflow: grid.Hidden},
 			{Text: unreadStyle.Render(readStr), Width: 4},
 		},
 	})
-	time_s := timeAgo(m.config.Article.Date)
+	time_s := timeAgo(m.Config.Article.Date)
 	rows = append(rows, grid.Row{
 		Width: m.width,
 		Cells: []grid.Cell{
-			{Text: lipgloss.NewStyle().Background(lipgloss.Color(m.config.Article.SourceColor)).Render(m.config.Article.SourceTitle), Width: 10, Align: grid.Left, Overflow: grid.Hidden},
+			{Text: lipgloss.NewStyle().Background(lipgloss.Color(m.Config.Article.SourceColor)).Render(m.Config.Article.SourceTitle), Width: 10, Align: grid.Left, Overflow: grid.Hidden},
 			{Text: timeStyle.Render(time_s), Width: m.width - 10, Align: grid.Left},
 		},
 	})
-
 	border := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("#444444")).
@@ -127,7 +128,11 @@ func (m *Model) View() string {
 	rendered_row := grid.Render(grid.Grid{
 		Rows: rows,
 	})
-	return border.Render(rendered_row)
+	if m.Show {
+		return border.Render(rendered_row)
+	} else {
+		return ""
+	}
 }
 
 func timeAgo(date *time.Time) string {

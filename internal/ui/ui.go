@@ -15,6 +15,7 @@ import (
 	mon "nned/internal/monitor"
 
 	grid "github.com/achannarasappa/term-grid"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -33,6 +34,7 @@ type Model struct {
 	monitor        *mon.Monitor
 	mu             sync.RWMutex
 	versionVector  int
+	filterInput    textinput.Model
 }
 
 type SetArticleMsg struct {
@@ -51,6 +53,7 @@ var (
 
 const (
 	footerHeight   = 1
+	headerHeight   = 3
 	minFooterWidth = 80
 )
 
@@ -64,6 +67,7 @@ func NewModel(dep c.Dependencies, ctx c.Context, monitor *mon.Monitor) *Model {
 		article:      article.NewModel(),
 		headerHeight: 0,
 		monitor:      monitor,
+		filterInput:  util.NewTextInput(),
 	}
 }
 
@@ -94,6 +98,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < 0 {
 				m.cursor = 0
 			}
+			if m.cursor < m.news.GetCurrentPage()*m.news.GetPerPage() {
+				m.news.SetCurrentPage(m.news.GetCurrentPage() - 1)
+			}
 			m.news, cmd = m.news.Update(msg)
 			return m, cmd
 		case "down":
@@ -101,19 +108,40 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > len(m.articles)-1 {
 				m.cursor = len(m.articles) - 1
 			}
+			if m.cursor >= m.news.GetCurrentPage()*m.news.GetPerPage()+m.news.GetPerPage() {
+				m.news.SetCurrentPage(m.news.GetCurrentPage() + 1)
+			}
 			m.news, cmd = m.news.Update(msg)
 			return m, cmd
 		case "enter":
-			m.article, cmd = m.article.Update(article.SetArticleMsg(&m.articles[m.cursor]))
+			m.article, cmd = m.article.Update(article.SetArticleMsg(m.news.GetRowArticle(m.cursor)))
 			m.news, cmd = m.news.Update(msg)
 			return m, cmd
 		case "m":
 			m.news, cmd = m.news.Update(msg)
 			return m, cmd
+		case "h":
+			if m.news.GetCurrentPage()-1 >= 0 {
+				m.cursor = (m.news.GetCurrentPage()-1)*m.news.GetPerPage() - 1
+			}
+			m.news, cmd = m.news.Update(msg)
+			return m, cmd
+		case "l":
+			if m.news.GetCurrentPage()+1 < m.news.GetPageCount() {
+				m.cursor = (m.news.GetCurrentPage() + 1) * m.news.GetPerPage()
+			}
+			m.news, cmd = m.news.Update(msg)
+			return m, cmd
+			// case "f":
+			//	if m.filterInput.Focused() {
+			//		m.filterInput.Blur()
+			//		return m, nil
+			//	}
+			//	return m, m.filterInput.Focus()
 		}
 	case tea.WindowSizeMsg:
 		var cmd tea.Cmd
-		viewportHeight := msg.Height - m.headerHeight - footerHeight
+		viewportHeight := msg.Height - m.headerHeight - footerHeight - headerHeight
 
 		if !m.ready {
 			m.viewport = viewport.New(msg.Width, viewportHeight)
@@ -153,7 +181,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.news, cmd = m.news.Update(msg)
 		return m, cmd
 	}
-	return m, nil
+	m.filterInput, cmd = m.filterInput.Update(msg)
+	m.news, cmd = m.news.Update(news.SetFilterMsg(m.filterInput.Value()))
+	return m, cmd
 }
 
 func (m *Model) View() string {
@@ -164,8 +194,7 @@ func (m *Model) View() string {
 	content = lipgloss.JoinHorizontal(lipgloss.Top, m.news.View(), m.article.View())
 	m.viewport.SetContent(content)
 
-	return m.viewport.View() + "\n" +
-		footer(m.viewport.Width, m.lastUpdateTime)
+	return lipgloss.JoinVertical(lipgloss.Left, m.header(), m.viewport.View(), m.footer())
 }
 
 func tick(t int) tea.Cmd {
@@ -176,19 +205,25 @@ func tick(t int) tea.Cmd {
 	})
 }
 
-func footer(width int, time string) string {
-	if width < minFooterWidth {
+func (m *Model) header() string {
+	headerStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("24"))
+
+	return headerStyle.Render(m.filterInput.View())
+}
+
+func (m *Model) footer() string {
+	if m.viewport.Width < minFooterWidth {
 		return "nned"
 	}
-	help := "q: exit ↑: scroll up ↓: scroll down s: search m: mark read/unread enter: read article"
+	help := "q: exit ↑: scroll up ↓: scroll down f: filter m: mark read/unread enter: read article"
 	return grid.Render(grid.Grid{
 		Rows: []grid.Row{
 			{
-				Width: width,
+				Width: m.viewport.Width,
 				Cells: []grid.Cell{
 					{Text: styleLogo.Render(" nned "), Width: 7},
 					{Text: styleHelp.Render(help), Width: len(help)},
-					{Text: styleHelp.Render("T: " + time), Align: grid.Right},
+					{Text: styleHelp.Render("T: " + m.lastUpdateTime), Align: grid.Right},
 				},
 			},
 		},

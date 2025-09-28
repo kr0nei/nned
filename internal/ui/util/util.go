@@ -6,6 +6,7 @@ import (
 
 	c "nned/internal/common"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/net/html"
 )
@@ -45,6 +46,16 @@ func GetHash(s string) uint64 {
 	h := fnv.New64a()
 	h.Write([]byte(s))
 	return h.Sum64()
+}
+
+func NewTextInput() textinput.Model {
+	ti := textinput.New()
+	ti.Placeholder = "Start typing to filter..."
+	ti.CharLimit = 50
+	ti.Width = 30
+	ti.Prompt = "⌕"
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("24")).Margin(0, 1)
+	return ti
 }
 
 func DateCmp(a, b c.Article) int {
